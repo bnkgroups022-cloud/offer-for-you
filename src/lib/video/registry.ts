@@ -3,6 +3,7 @@ import type { VideoProviderId } from "@/types/video";
 import { hailuoProvider } from "@/lib/video/providers/hailuo";
 import { pixverseProvider } from "@/lib/video/providers/pixverse";
 import { klingProvider } from "@/lib/video/providers/kling";
+import { wanVideoAdapter } from "@/lib/video/providers/wan";
 
 /**
  * Single place that knows every provider that exists. To add a new video
@@ -14,6 +15,7 @@ const registry: Record<VideoProviderId, VideoProviderAdapter> = {
   hailuo: hailuoProvider,
   pixverse: pixverseProvider,
   kling: klingProvider,
+  wan: wanVideoAdapter,
 };
 
 export function getVideoProvider(id: VideoProviderId): VideoProviderAdapter {

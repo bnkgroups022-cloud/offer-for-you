@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { GeneratorForm } from "@/components/generator/GeneratorForm";
 import { GeneratorResults } from "@/components/generator/GeneratorResults";
+import { WanVideoGeneratorCard } from "@/components/generator/WanVideoGeneratorCard";
 import { useAdGenerator } from "@/hooks/useAdGenerator";
 import { useAuth } from "@/hooks/useAuth";
 import { createProject } from "@/lib/projects/client";
@@ -95,6 +96,10 @@ export default function GeneratePage() {
           videoStyle={lastInput?.videoStyle}
           onReset={handleReset}
         />
+      </div>
+
+      <div className="mt-6">
+        <WanVideoGeneratorCard />
       </div>
     </div>
   );

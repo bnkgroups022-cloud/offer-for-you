@@ -1,6 +1,6 @@
 import type { Project } from "@/types/project";
 import type { GeneratedAdKit } from "@/types/generator";
-import type { VideoProviderId } from "@/types/video";
+import type { VideoProviderId, WanVideoStyle } from "@/types/video";
 
 interface ProjectsListResponse {
   success: boolean;
@@ -67,21 +67,30 @@ export async function deleteProject(id: string, uid: string): Promise<void> {
 }
 
 export interface GenerateVideoInput {
-  projectId: string;
+  /** Omit to create a new project from the image + fields below (Wan flow). */
+  projectId?: string;
   uid: string;
   provider: VideoProviderId;
-  prompt: string;
+  /** Required when projectId is given; auto-generated server-side otherwise. */
+  prompt?: string;
   imageUrl?: string;
+  /** Required when projectId is omitted. */
+  imagePublicId?: string;
+  productName?: string;
+  category?: string;
+  language?: string;
+  style?: WanVideoStyle;
 }
 
 interface GenerateVideoResponse {
   success: boolean;
   jobId?: string;
   status?: string;
+  projectId?: string;
   error?: string;
 }
 
-export async function generateVideo(input: GenerateVideoInput): Promise<{ jobId: string }> {
+export async function generateVideo(input: GenerateVideoInput): Promise<{ jobId: string; projectId: string }> {
   const response = await fetch("/api/video/generate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,11 +98,11 @@ export async function generateVideo(input: GenerateVideoInput): Promise<{ jobId:
   });
   const body: GenerateVideoResponse = await response.json();
 
-  if (!response.ok || !body.success || !body.jobId) {
+  if (!response.ok || !body.success || !body.jobId || !body.projectId) {
     throw new Error(body.error ?? "Could not start video generation.");
   }
 
-  return { jobId: body.jobId };
+  return { jobId: body.jobId, projectId: body.projectId };
 }
 
 export async function fetchVideoStatus(projectId: string, uid: string): Promise<Project> {

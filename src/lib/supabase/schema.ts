@@ -34,13 +34,28 @@ export const deleteProjectQuerySchema = z.object({
   uid: z.string().min(1, "uid is required."),
 });
 
-/** Validates the body of POST /api/video/generate. */
+/**
+ * Validates the body of POST /api/video/generate. Two modes, both
+ * validated by this one schema (the route branches on whether
+ * `projectId` is present):
+ *  - Existing project (Phase 6, e.g. the Download Assets page): send
+ *    `projectId` + `prompt`.
+ *  - Direct image -> video, no project yet (Phase 1 Wan flow on
+ *    /dashboard/generate): omit `projectId`, send `imageUrl`,
+ *    `imagePublicId` and `productName` instead — the route creates the
+ *    project row itself and auto-generates the prompt if none is given.
+ */
 export const generateVideoSchema = z.object({
-  projectId: z.string().min(1, "projectId is required."),
+  projectId: z.string().min(1).optional(),
   uid: z.string().min(1, "uid is required."),
-  provider: z.enum(["hailuo", "pixverse", "kling"]),
-  prompt: z.string().min(1, "A prompt is required."),
+  provider: z.enum(["hailuo", "pixverse", "kling", "wan"]),
+  prompt: z.string().min(1).optional(),
   imageUrl: z.string().url().optional(),
+  imagePublicId: z.string().min(1).optional(),
+  productName: z.string().min(1).max(200).optional(),
+  category: z.string().max(120).optional(),
+  language: z.string().max(60).optional(),
+  style: z.enum(["ugc", "cinematic", "luxury", "tech"]).optional(),
 });
 
 /** Validates the query params used by GET /api/video/status. */

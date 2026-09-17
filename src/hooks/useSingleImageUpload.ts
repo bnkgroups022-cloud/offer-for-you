@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { validateImageFile } from "@/lib/cloudinary/validate";
-import { uploadImageToCloudinary } from "@/lib/cloudinary/upload";
+import { uploadImageToCloudinary, uploadImageToCloudinarySigned } from "@/lib/cloudinary/upload";
 import { deleteCloudinaryAsset } from "@/lib/cloudinary/delete";
 import type { CloudinaryAsset } from "@/types/upload";
 
@@ -12,8 +12,12 @@ export type SingleUploadStatus = "empty" | "uploading" | "success" | "error";
  * A single-image variant of useImageUpload, for forms that need exactly
  * one product photo (like the AI Generator) rather than a managed list.
  * Reuses the same Cloudinary upload/delete/validate helpers from Phase 2.
+ *
+ * `signed: true` (used by the Wan 2.2 video flow) uploads via the signed
+ * endpoint instead of the unsigned preset — every existing caller omits
+ * this option and keeps its current unsigned behavior unchanged.
  */
-export function useSingleImageUpload() {
+export function useSingleImageUpload({ signed = false }: { signed?: boolean } = {}) {
   const [status, setStatus] = useState<SingleUploadStatus>("empty");
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +75,9 @@ export function useSingleImageUpload() {
     const controller = new AbortController();
     controllerRef.current = controller;
 
-    uploadImageToCloudinary(file, {
+    const uploadFn = signed ? uploadImageToCloudinarySigned : uploadImageToCloudinary;
+
+    uploadFn(file, {
       signal: controller.signal,
       onProgress: setProgress,
     })
@@ -84,7 +90,7 @@ export function useSingleImageUpload() {
         setStatus("error");
         setError(err instanceof Error ? err.message : "Upload failed.");
       });
-  }, []);
+  }, [signed]);
 
   useEffect(() => {
     return () => {
