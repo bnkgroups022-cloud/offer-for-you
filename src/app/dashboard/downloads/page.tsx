@@ -7,13 +7,20 @@ import { Icon } from "@/components/ui/Icon";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { AssetExportCard } from "@/components/downloads/AssetExportCard";
 import { GenerateVideoCard } from "@/components/downloads/GenerateVideoCard";
+import { useAuth } from "@/hooks/useAuth";
 import { useProjects } from "@/hooks/useProjects";
 import { downloadProjectAsText } from "@/lib/projects/download";
 import { formatHashtags } from "@/lib/export/assetExport";
+import type { ProjectVideo } from "@/types/video";
 
 export default function DownloadsPage() {
+  const { user } = useAuth();
   const { projects, status } = useProjects();
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // useProjects() doesn't expose a setter, so in-flight video status
+  // (from GenerateVideoCard's polling) is tracked here and merged over
+  // whatever useProjects last fetched, keyed by project id.
+  const [videoOverrides, setVideoOverrides] = useState<Record<string, ProjectVideo>>({});
 
   // Default to the most recent project once the list loads. If the
   // selected project gets deleted elsewhere, fall back to the new first
@@ -25,7 +32,11 @@ export default function DownloadsPage() {
     }
   }, [projects, selectedId]);
 
-  const project = projects.find((p) => p.id === selectedId) ?? null;
+  const baseProject = projects.find((p) => p.id === selectedId) ?? null;
+  const project =
+    baseProject && videoOverrides[baseProject.id]
+      ? { ...baseProject, video: videoOverrides[baseProject.id] }
+      : baseProject;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -109,7 +120,13 @@ export default function DownloadsPage() {
             />
           </div>
 
-          <GenerateVideoCard />
+          <GenerateVideoCard
+            project={project}
+            uid={user?.uid}
+            onVideoChange={(projectId, video) =>
+              setVideoOverrides((prev) => ({ ...prev, [projectId]: video }))
+            }
+          />
 
           <div className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3 sm:flex-row sm:items-center">
             <div>

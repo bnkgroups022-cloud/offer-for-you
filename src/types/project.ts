@@ -1,4 +1,5 @@
 import type { GeneratedAdKit } from "@/types/generator";
+import type { ProjectVideo } from "@/types/video";
 
 /**
  * A saved ad kit, persisted to Supabase once the AI Generator (Phase 3)
@@ -15,4 +16,6 @@ export interface Project {
   imagePublicId: string;
   adKit: GeneratedAdKit;
   createdAt: string;
+  /** The project's latest video-generation attempt (Phase 6), if any. */
+  video: ProjectVideo;
 }

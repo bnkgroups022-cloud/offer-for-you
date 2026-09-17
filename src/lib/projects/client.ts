@@ -1,5 +1,6 @@
 import type { Project } from "@/types/project";
 import type { GeneratedAdKit } from "@/types/generator";
+import type { VideoProviderId } from "@/types/video";
 
 interface ProjectsListResponse {
   success: boolean;
@@ -63,4 +64,47 @@ export async function deleteProject(id: string, uid: string): Promise<void> {
   if (!response.ok || !body.success) {
     throw new Error(body.error ?? "Could not delete this project.");
   }
+}
+
+export interface GenerateVideoInput {
+  projectId: string;
+  uid: string;
+  provider: VideoProviderId;
+  prompt: string;
+  imageUrl?: string;
+}
+
+interface GenerateVideoResponse {
+  success: boolean;
+  jobId?: string;
+  status?: string;
+  error?: string;
+}
+
+export async function generateVideo(input: GenerateVideoInput): Promise<{ jobId: string }> {
+  const response = await fetch("/api/video/generate", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const body: GenerateVideoResponse = await response.json();
+
+  if (!response.ok || !body.success || !body.jobId) {
+    throw new Error(body.error ?? "Could not start video generation.");
+  }
+
+  return { jobId: body.jobId };
+}
+
+export async function fetchVideoStatus(projectId: string, uid: string): Promise<Project> {
+  const response = await fetch(
+    `/api/video/status?projectId=${encodeURIComponent(projectId)}&uid=${encodeURIComponent(uid)}`
+  );
+  const body: ProjectResponse = await response.json();
+
+  if (!response.ok || !body.success || !body.project) {
+    throw new Error(body.error ?? "Could not check video status.");
+  }
+
+  return body.project;
 }

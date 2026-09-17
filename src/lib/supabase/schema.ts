@@ -33,3 +33,18 @@ export const listProjectsQuerySchema = z.object({
 export const deleteProjectQuerySchema = z.object({
   uid: z.string().min(1, "uid is required."),
 });
+
+/** Validates the body of POST /api/video/generate. */
+export const generateVideoSchema = z.object({
+  projectId: z.string().min(1, "projectId is required."),
+  uid: z.string().min(1, "uid is required."),
+  provider: z.enum(["hailuo", "pixverse", "kling"]),
+  prompt: z.string().min(1, "A prompt is required."),
+  imageUrl: z.string().url().optional(),
+});
+
+/** Validates the query params used by GET /api/video/status. */
+export const videoStatusQuerySchema = z.object({
+  projectId: z.string().min(1, "projectId is required."),
+  uid: z.string().min(1, "uid is required."),
+});

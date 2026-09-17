@@ -226,6 +226,65 @@ Download History stays empty even after you export things), and
 Generate Video does nothing beyond explaining itself — both are called
 out above and in the Roadmap.
 
+## Phase 6 — Video Generation
+
+The **Generate Video** card on `/dashboard/downloads` is now real (for
+Hailuo and PixVerse — Kling stays a placeholder, see below), built on a
+provider abstraction so more video-gen vendors can be added later without
+touching the routes, the DB layer, or the UI.
+
+**Provider abstraction (`src/lib/video/`):**
+- `types.ts` defines one interface, `VideoProviderAdapter`
+  (`isConfigured()`, `submit()`, `checkStatus()`), that every provider
+  implements. The API routes and the UI only ever depend on this
+  interface — never on a specific vendor's request/response shape.
+- `providers/hailuo.ts` and `providers/pixverse.ts` are real HTTP
+  adapters, each reading its own `*_API_KEY` env var. **Caveat:** neither
+  was tested against a live account while building this (no API keys
+  were available) — the endpoint paths and field names follow each
+  vendor's publicly documented API as of this writing, but third-party
+  APIs change; verify against your own provider dashboard once you have
+  real credentials, and adjust the one file if something's shifted.
+- `providers/kling.ts` is an explicit placeholder, as specced — it
+  reports itself as unconfigured and throws if called. It's registered in
+  the provider list anyway, so the selector shows it as a real option
+  ("Coming soon") instead of being special-cased in the UI.
+- `registry.ts` maps provider id → adapter. **Adding a new provider is
+  one new file plus one line here** — nothing else changes.
+
+**How generation works (async submit + poll, since these providers don't
+return a finished video in one request):**
+1. `POST /api/video/generate` — looks up the chosen provider's adapter,
+   calls `submit()` with the (editable) video prompt and the project's
+   product image, then saves the provider, prompt, job id and
+   `status: "processing"` onto the project row. This is where **the
+   prompt gets saved** — before the video itself exists.
+2. The browser polls `GET /api/video/status` every 5s. Each poll calls
+   the same adapter's `checkStatus()`; once the provider reports
+   completed or failed, that route **persists `video_url` (or the error)
+   to Supabase** and returns the updated project. Polling stops as soon
+   as the status leaves `"processing"` — including on page reload, since
+   the poll resumes automatically if a project is reopened mid-generation.
+3. The UI shows a live status card throughout: an animated "generating…"
+   indicator while processing, the error message inline if it fails, and
+   on success an inline `<video>` preview plus a real **Download** button
+   linking straight to the stored `video_url`.
+
+**Data model:** rather than a separate table, six nullable columns were
+added directly to `projects` (`video_provider`, `video_prompt`,
+`video_status`, `video_job_id`, `video_url`, `video_error`) — see
+**Video Generation Setup** below for the migration SQL. This keeps one
+"latest attempt" per project, matching how the card is presented
+(re-generating overwrites it, it's not a history list), consistent with
+how the ad kit itself is stored as a single `jsonb` column rather than
+a normalized table.
+
+**Not included yet:** Kling itself (placeholder only, as specced), a
+history of multiple video attempts per project (only the latest is kept),
+and — same gap as every other route — real ownership/session
+verification (`uid` is still trusted as given by the client, not verified
+server-side).
+
 ## Tech stack
 
 - Next.js 15 (App Router), TypeScript, Tailwind CSS
@@ -234,7 +293,10 @@ out above and in the Roadmap.
 - OpenAI API (AI Generator, Phase 3 — live), validated with `zod`
 - Supabase (persistence, Phase 4 — live), accessed only server-side with
   the service role key
-- Kling API (future — the Kling prompt output is already Kling-ready)
+- Hailuo (MiniMax) and PixVerse video generation APIs (Phase 6 — live,
+  behind a modular provider abstraction, see `src/lib/video/`)
+- Kling API (placeholder — the Kling prompt output is already
+  Kling-ready, but the API itself isn't connected yet)
 
 ## Prerequisites
 
@@ -244,6 +306,9 @@ out above and in the Roadmap.
 - An OpenAI API key with access to a vision-capable model (e.g. `gpt-4o`)
 - A Supabase project (free tier is fine) with a `projects` table — see
   **Supabase Setup** below
+- Optional: a Hailuo (MiniMax) and/or PixVerse API key, if you want the
+  Generate Video card to actually work — see **Video Generation Setup**
+  below. Neither is required for the rest of the app.
 
 > Note: this project was authored in a sandboxed environment without
 > package-registry access, so `npm install` / `npm run build` have not
@@ -534,6 +599,72 @@ alter table projects enable row level security;
   image behind `image_url` was deleted independently (e.g. manually in
   Cloudinary's console) after the project was saved.
 
+## Video Generation Setup (step by step)
+
+Optional — the rest of the app works fully without this. Only needed if
+you want the **Generate Video** card on `/dashboard/downloads` to
+actually produce a video instead of showing "isn't configured yet."
+
+**1. Add the video columns to your `projects` table**
+
+In Supabase's **SQL Editor**, run:
+
+```sql
+alter table projects
+  add column if not exists video_provider text,
+  add column if not exists video_prompt text,
+  add column if not exists video_status text not null default 'idle',
+  add column if not exists video_job_id text,
+  add column if not exists video_url text,
+  add column if not exists video_error text;
+```
+
+**2. Get a Hailuo (MiniMax) API key**
+1. Sign up at MiniMax's developer platform and create an API key from
+   your account dashboard.
+2. Paste it into `HAILUO_API_KEY` in `.env.local`. Leave
+   `HAILUO_API_BASE_URL` blank unless MiniMax's docs show a different
+   base URL than the default already in `src/lib/video/providers/hailuo.ts`.
+
+**3. Get a PixVerse API key**
+1. Sign up at PixVerse's Open Platform and create an API key from your
+   account dashboard.
+2. Paste it into `PIXVERSE_API_KEY` in `.env.local`. Leave
+   `PIXVERSE_API_BASE_URL` blank unless PixVerse's docs show a different
+   base URL than the default already in `src/lib/video/providers/pixverse.ts`.
+
+**4. Confirm it's wired up correctly**
+1. Fill in whichever key(s) you have in `.env.local`, then restart
+   `npm run dev`.
+2. Sign in, go to **Download Assets**, pick a project. The **Generate
+   Video** card's provider selector should show your configured
+   provider(s) enabled and Kling permanently disabled ("Soon").
+3. Edit the prompt if you like (it's pre-filled from the AI Prompt), pick
+   a provider, click **Generate Video** — a "generating…" status appears.
+4. Wait (this can take a couple of minutes depending on the provider) —
+   when it finishes, a video preview and a **Download Video** button
+   appear in the card.
+5. Check Supabase's **Table Editor → projects** — the row's
+   `video_provider`, `video_prompt`, `video_status` (`completed`) and
+   `video_url` columns should all be filled in.
+6. Reload the page mid-generation once (start a new one, then refresh
+   before it finishes) — the card should pick the in-flight job back up
+   and keep polling, not lose track of it.
+
+**Common issues**
+- **"[Provider] isn't configured yet"** — that provider's `*_API_KEY` is
+  missing from `.env.local`, or the dev server needs a restart after
+  adding it.
+- **Generation fails immediately** — double-check the key is valid and
+  your account has credits/billing set up on the provider's side; the
+  error message shown in the card comes straight from the provider's API
+  response where possible.
+- **Stuck on "generating…" indefinitely** — see the caveat in the Phase 6
+  section above: the adapter's endpoint/field names are unverified
+  against a live account and may need adjusting in
+  `src/lib/video/providers/hailuo.ts` or `pixverse.ts` to match your
+  provider's current API docs.
+
 ## Folder structure
 
 ```
@@ -553,6 +684,8 @@ src/
       generate/route.ts        Server route: OpenAI call (has the API key)
       projects/route.ts        Server route: GET (list) / POST (save) a project
       projects/[id]/route.ts   Server route: DELETE a project (Cloudinary + Supabase)
+      video/generate/route.ts  Server route: submit a video job to the chosen provider
+      video/status/route.ts    Server route: poll + persist a video job's result
   components/
     ui/                  Button, Card, Icon — generic building blocks
     landing/             Navbar, Hero, Features, HowItWorks, Pricing, FAQ,
@@ -569,13 +702,14 @@ src/
                           OutputSection, CopyButton
     projects/            ProjectCard (thumbnail, download, delete)
     downloads/           AssetExportCard (per-asset Copy + Download),
-                          GenerateVideoCard (disabled Kling placeholder)
+                          GenerateVideoCard (real, Hailuo/PixVerse/Kling)
   context/AuthContext.tsx Firebase auth state, exposed via useAuth()
   hooks/useAuth.ts
   hooks/useImageUpload.ts       Upload list state (dashboard widget)
   hooks/useSingleImageUpload.ts One-image variant (AI Generator form)
   hooks/useAdGenerator.ts       Calls /api/generate, tracks status/result/lastInput
   hooks/useProjects.ts          Fetches + deletes projects for the signed-in user
+  hooks/useVideoGenerator.ts    Submit + poll lifecycle for one project's video job
   lib/firebase/          client.ts (init) + auth.ts (sign-in/out helpers)
   lib/cloudinary/        validate.ts, upload.ts, delete.ts (client-safe),
                           server.ts (Admin SDK — server-only, has the secret)
@@ -584,15 +718,20 @@ src/
                           schema.ts (zod validation + the JSON Schema
                           passed to OpenAI's Structured Outputs)
   lib/supabase/          server.ts (service-role client — server-only),
-                          schema.ts (zod validation for project payloads),
+                          schema.ts (zod validation for project + video payloads),
                           mappers.ts (DB row ↔ app Project type)
-  lib/projects/          client.ts (fetch wrappers for /api/projects),
-                          download.ts (client-side full-kit .txt export)
+  lib/projects/          client.ts (fetch wrappers for /api/projects and
+                          /api/video/*), download.ts (client-side full-kit .txt export)
   lib/export/            assetExport.ts (client-side per-asset .txt export)
+  lib/video/              types.ts (the VideoProviderAdapter contract),
+                          registry.ts (provider id → adapter),
+                          providers/hailuo.ts, providers/pixverse.ts,
+                          providers/kling.ts (placeholder)
   lib/slugify.ts          Shared filename-safe slug helper
   config/brand.ts        Brand colors + the nav map
-  config/generator.ts    Category and language options for the form
-  types/user.ts, types/upload.ts, types/generator.ts, types/project.ts
+  config/generator.ts    Category, language and video-style options for the form
+  config/video.ts        Client-safe video provider metadata for the selector
+  types/user.ts, types/upload.ts, types/generator.ts, types/project.ts, types/video.ts
 ```
 
 ## Deploy to Vercel
@@ -795,6 +934,48 @@ Report back what breaks, and I'll fix it before we tackle real Kling
 video generation and the Firebase Admin token verification that's been
 flagged as outstanding since Phase 2.
 
+## Phase 6 Test
+
+Run through this after adding at least one of `HAILUO_API_KEY` /
+`PIXVERSE_API_KEY` and running the SQL from **Video Generation Setup**
+above (with no keys added at all, the card still renders — every
+provider button just stays disabled, which is worth checking too):
+
+1. Open **Download Assets** with a saved project selected — the
+   **Generate Video** card now shows a provider selector (Hailuo,
+   PixVerse, Kling), an editable prompt (pre-filled from the AI Prompt),
+   and a **Generate Video** button
+2. **Kling** is always disabled with a "Soon" badge, regardless of env
+   vars — clicking it does nothing
+3. With no `HAILUO_API_KEY`/`PIXVERSE_API_KEY` set, both remaining
+   provider buttons are still selectable, but submitting shows a clear
+   "isn't configured yet" error rather than a silent failure
+4. With a real key set, pick that provider, optionally edit the prompt,
+   click **Generate Video** — the button shows a spinner and an animated
+   "generating…" status card appears
+5. Check Supabase's **Table Editor → projects** right after submitting —
+   `video_provider`, `video_prompt` and `video_status` (`processing`)
+   should already be saved, before the video itself is ready
+6. Wait for it to finish — the status card is replaced by an inline
+   video preview and a **Download Video** button; clicking it downloads
+   or opens the real generated video
+7. Check Supabase again — `video_status` is now `completed` and
+   `video_url` holds the real URL
+8. Switch the **Project** dropdown to a different project, then back —
+   the card correctly shows that other project's own video state (or the
+   empty/idle state if it has none), not the previous project's
+9. Start a generation, then refresh the page before it finishes — the
+   card picks the in-flight job back up and resumes polling instead of
+   losing track of it
+10. Force a failure (e.g. a temporarily invalid key) — the card shows a
+    clear red error state, not a stuck spinner
+11. Resize to phone width — the provider selector, prompt box, status
+    states and video preview all stay readable and don't overflow
+
+Report back what breaks, and I'll fix it before tackling Firebase Admin
+token verification and real per-user AI Credits / Download History
+logging.
+
 ## Roadmap (next phases)
 
 - **Phase 2 (upload):** done
@@ -808,11 +989,19 @@ flagged as outstanding since Phase 2.
   download of Caption, WhatsApp Copy, Hashtags and AI Prompt, plus the
   full-kit download; Generate Video shown as an honest, disabled
   placeholder rather than faked
-- **Phase 6:** wire the actual Kling API behind the Generate Video
-  button, add real per-user AI Credits tracking, log real download
-  events so Download History stops being an empty state, and — before
-  any public launch — Firebase Admin ID-token verification to replace
-  the client-supplied-`uid` trust model used across all API routes so far
+- **Phase 6 (Video Generation):** done — modular provider abstraction
+  (`src/lib/video/`), real Hailuo + PixVerse adapters (endpoint details
+  unverified against a live account, see the Phase 6 section above),
+  Kling kept as an explicit placeholder, provider selector, saved prompt,
+  async submit-and-poll status tracking, video URL persisted to
+  Supabase, and a Download button once generation completes
+- **Phase 7 (still open):** wire the actual Kling API once it's
+  available, add real per-user AI Credits tracking, log real download
+  events so Download History stops being an empty state, verify the
+  Hailuo/PixVerse adapters against live accounts and correct any drifted
+  field names, and — before any public launch — Firebase Admin ID-token
+  verification to replace the client-supplied-`uid` trust model used
+  across all API routes so far
 
 ## Brand colors
 
