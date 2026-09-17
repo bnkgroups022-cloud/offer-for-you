@@ -7,10 +7,19 @@ import type {
 
 const RUNPOD_BASE_URL = "https://api.runpod.ai/v2";
 
+/**
+ * RUNPOD_ENDPOINT is accepted in either form:
+ *  - just the endpoint ID (e.g. "abc123xyz") — the common case, resolved
+ *    against RunPod's standard base URL.
+ *  - a full URL (e.g. "https://api.runpod.ai/v2/abc123xyz") — used as-is,
+ *    trailing slash stripped.
+ */
 function getEndpointUrl(path: string): string {
   const endpoint = process.env.RUNPOD_ENDPOINT;
   if (!endpoint) throw new Error("RUNPOD_ENDPOINT isn't set.");
-  return `${RUNPOD_BASE_URL}/${endpoint}${path}`;
+
+  const base = endpoint.startsWith("http") ? endpoint.replace(/\/+$/, "") : `${RUNPOD_BASE_URL}/${endpoint}`;
+  return `${base}${path}`;
 }
 
 function getApiKey(): string {
