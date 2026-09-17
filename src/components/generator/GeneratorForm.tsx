@@ -4,7 +4,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { ProductImagePicker } from "@/components/generator/ProductImagePicker";
-import { CATEGORY_OPTIONS, LANGUAGE_OPTIONS } from "@/config/generator";
+import { CATEGORY_OPTIONS, LANGUAGE_OPTIONS, VIDEO_STYLE_OPTIONS } from "@/config/generator";
 import { useSingleImageUpload } from "@/hooks/useSingleImageUpload";
 import type { GenerateInput } from "@/types/generator";
 
@@ -24,6 +24,7 @@ export function GeneratorForm({
   const [categoryValue, setCategoryValue] = useState<string>(CATEGORY_OPTIONS[0].value);
   const [customCategory, setCustomCategory] = useState("");
   const [language, setLanguage] = useState<string>(LANGUAGE_OPTIONS[0].value);
+  const [videoStyle, setVideoStyle] = useState<string>(VIDEO_STYLE_OPTIONS[0].value);
 
   const categoryLabel = useMemo(() => {
     if (categoryValue === "other") return customCategory.trim();
@@ -33,6 +34,11 @@ export function GeneratorForm({
   const languageLabel = useMemo(
     () => LANGUAGE_OPTIONS.find((option) => option.value === language)?.label ?? language,
     [language]
+  );
+
+  const videoStyleLabel = useMemo(
+    () => VIDEO_STYLE_OPTIONS.find((option) => option.value === videoStyle)?.label ?? videoStyle,
+    [videoStyle]
   );
 
   const isValid =
@@ -51,6 +57,7 @@ export function GeneratorForm({
       productName: productName.trim(),
       category: categoryLabel,
       language: languageLabel,
+      videoStyle: videoStyleLabel,
     });
   }
 
@@ -121,6 +128,27 @@ export function GeneratorForm({
               </option>
             ))}
           </select>
+        </div>
+
+        <div>
+          <label htmlFor="videoStyle" className={fieldLabel}>
+            Video Style
+          </label>
+          <select
+            id="videoStyle"
+            value={videoStyle}
+            onChange={(e) => setVideoStyle(e.target.value)}
+            className={fieldControl}
+          >
+            {VIDEO_STYLE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 text-xs text-slate-600">
+            Shapes the Kling / Hailuo / PixVerse prompt cards on the right.
+          </p>
         </div>
 
         <Button type="submit" size="lg" fullWidth isLoading={isGenerating} disabled={!isValid}>

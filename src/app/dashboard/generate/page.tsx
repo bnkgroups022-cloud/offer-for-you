@@ -88,7 +88,13 @@ export default function GeneratePage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
         <GeneratorForm onGenerate={generate} isGenerating={status === "generating"} />
-        <GeneratorResults status={status} result={result} error={error} onReset={handleReset} />
+        <GeneratorResults
+          status={status}
+          result={result}
+          error={error}
+          videoStyle={lastInput?.videoStyle}
+          onReset={handleReset}
+        />
       </div>
     </div>
   );

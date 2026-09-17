@@ -25,3 +25,16 @@ export const LANGUAGE_OPTIONS = [
   { value: "bengali", label: "Bengali" },
   { value: "marathi", label: "Marathi" },
 ] as const;
+
+/**
+ * Not sent to the AI (the /api/generate route and its schema are
+ * unchanged) — used client-side to frame the Kling/Hailuo/PixVerse prompt
+ * cards, since all three tools take the same free-text prompt style.
+ */
+export const VIDEO_STYLE_OPTIONS = [
+  { value: "cinematic", label: "Cinematic & Premium" },
+  { value: "ugc", label: "UGC / Handheld" },
+  { value: "studio", label: "Clean Studio Product Shot" },
+  { value: "lifestyle", label: "Lifestyle / In-Use" },
+  { value: "trendy", label: "Fast-Cut Trendy Reel" },
+] as const;

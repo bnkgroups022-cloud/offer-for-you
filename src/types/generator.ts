@@ -11,6 +11,10 @@ export interface GenerateInput {
   category: string;
   /** Human-readable label, e.g. "Hinglish (Hindi + English)". */
   language: string;
+  /** Human-readable label, e.g. "Cinematic & Premium". Client-side only —
+   *  not read by the API route; frames the Kling/Hailuo/PixVerse prompt
+   *  cards in the UI instead. */
+  videoStyle?: string;
 }
 
 export interface GeneratedAdKit {

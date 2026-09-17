@@ -6,25 +6,86 @@ import { Button } from "@/components/ui/Button";
 import type { GeneratedAdKit } from "@/types/generator";
 import type { GeneratorStatus } from "@/hooks/useAdGenerator";
 
+/** Kling/Hailuo/PixVerse all accept the same free-text cinematic prompt
+ *  style — the API only generates one (klingPrompt), so each card frames
+ *  it with the user's chosen video style rather than calling the AI three
+ *  separate times. */
+function buildVideoToolPrompt(klingPrompt: string, videoStyle?: string): string {
+  return videoStyle ? `${videoStyle} style.\n\n${klingPrompt}` : klingPrompt;
+}
+
+function EmptyStateIllustration() {
+  return (
+    <svg viewBox="0 0 160 120" className="h-28 w-36" aria-hidden="true">
+      <rect
+        x="20"
+        y="16"
+        width="90"
+        height="66"
+        rx="10"
+        className="fill-white/[0.04] stroke-white/10"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M32 68 L54 44 L70 60 L82 48 L98 68 Z"
+        className="fill-brand-accent/20"
+      />
+      <circle cx="42" cy="34" r="6" className="fill-brand-accent/40" />
+      <g className="animate-float">
+        <rect
+          x="86"
+          y="40"
+          width="54"
+          height="54"
+          rx="14"
+          className="fill-brand-primary/20 stroke-brand-accent/40"
+          strokeWidth="1.5"
+        />
+        <path
+          d="M113 58v20m0 0 8-8m-8 8-8-8"
+          className="stroke-brand-accent"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          fill="none"
+        />
+      </g>
+    </svg>
+  );
+}
+
+function GeneratingLoader() {
+  return (
+    <div className="relative flex h-16 w-16 items-center justify-center">
+      <span className="absolute h-16 w-16 animate-ping rounded-full bg-brand-accent/20" />
+      <span className="absolute h-11 w-11 animate-pulse rounded-full bg-brand-accent/20" />
+      <span className="relative h-6 w-6 animate-spin rounded-full border-2 border-white/20 border-t-brand-accent" />
+    </div>
+  );
+}
+
 export function GeneratorResults({
   status,
   result,
   error,
+  videoStyle,
   onReset,
 }: {
   status: GeneratorStatus;
   result: GeneratedAdKit | null;
   error: string | null;
+  videoStyle?: string;
   onReset: () => void;
 }) {
   if (status === "idle") {
     return (
       <div className="flex min-h-[320px] flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center">
-        <p className="text-sm font-medium text-white">Your ad kit will appear here</p>
+        <EmptyStateIllustration />
+        <p className="mt-4 text-sm font-medium text-white">Your ad kit will appear here</p>
         <p className="mt-1 max-w-xs text-xs text-slate-500">
-          Fill in the form and hit Generate — analysis, hooks, script, a
-          Kling prompt, WhatsApp message, caption and hashtags all come
-          back together.
+          Fill in the form and hit Generate — analysis, hooks, script,
+          Kling/Hailuo/PixVerse prompts, WhatsApp message, caption and
+          hashtags all come back together.
         </p>
       </div>
     );
@@ -32,10 +93,12 @@ export function GeneratorResults({
 
   if (status === "generating") {
     return (
-      <div className="flex min-h-[320px] flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-10 text-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/20 border-t-brand-accent" />
-        <p className="text-sm text-slate-300">Generating your ad kit…</p>
-        <p className="text-xs text-slate-500">This usually takes 10-30 seconds.</p>
+      <div className="flex min-h-[320px] flex-col items-center justify-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-10 text-center">
+        <GeneratingLoader />
+        <div>
+          <p className="text-sm text-slate-300">Generating your ad kit…</p>
+          <p className="mt-1 text-xs text-slate-500">This usually takes 10-30 seconds.</p>
+        </div>
       </div>
     );
   }
@@ -55,6 +118,9 @@ export function GeneratorResults({
   if (!result) return null;
 
   const allHashtags = result.hashtags.join(" ");
+  const klingPrompt = buildVideoToolPrompt(result.klingPrompt, videoStyle);
+  const hailuoPrompt = buildVideoToolPrompt(result.klingPrompt, videoStyle);
+  const pixversePrompt = buildVideoToolPrompt(result.klingPrompt, videoStyle);
 
   return (
     <div className="flex flex-col gap-4">
@@ -101,8 +167,22 @@ export function GeneratorResults({
         </pre>
       </OutputSection>
 
-      <OutputSection title="Kling Prompt" action={<CopyButton text={result.klingPrompt} />}>
-        <p className="text-sm leading-relaxed text-slate-300">{result.klingPrompt}</p>
+      <OutputSection title="Kling Prompt" action={<CopyButton text={klingPrompt} />}>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{klingPrompt}</p>
+      </OutputSection>
+
+      <OutputSection title="Hailuo Prompt" action={<CopyButton text={hailuoPrompt} />}>
+        <p className="mb-2 text-xs text-slate-500">
+          Same cinematic prompt, ready to paste into Hailuo (MiniMax).
+        </p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{hailuoPrompt}</p>
+      </OutputSection>
+
+      <OutputSection title="PixVerse Prompt" action={<CopyButton text={pixversePrompt} />}>
+        <p className="mb-2 text-xs text-slate-500">
+          Same cinematic prompt, ready to paste into PixVerse.
+        </p>
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{pixversePrompt}</p>
       </OutputSection>
 
       <OutputSection title="WhatsApp Message" action={<CopyButton text={result.whatsappMessage} />}>
