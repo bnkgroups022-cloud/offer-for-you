@@ -1,0 +1,90 @@
+{
+  "_comment": "Starting-point ComfyUI API-format workflow for Wan 2.2 image-to-video. Node IDs below (3=LoadImage, 6=positive prompt, 27=size/frames, 40=video export) match the WORKFLOW_*_NODE_ID defaults in handler.py. Export your own working workflow from the ComfyUI UI (Workflow -> Export (API)) once you've tuned it, drop it in here, and update the node IDs in your .env if they differ. This placeholder graph shows the shape handler.py expects to patch, not a fully tuned production graph.",
+  "3": {
+    "class_type": "LoadImage",
+    "inputs": {
+      "image": "input.png"
+    }
+  },
+  "6": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "",
+      "clip": ["38", 0]
+    }
+  },
+  "7": {
+    "class_type": "CLIPTextEncode",
+    "inputs": {
+      "text": "low quality, blurry, distorted, watermark",
+      "clip": ["38", 0]
+    }
+  },
+  "27": {
+    "class_type": "WanImageToVideo",
+    "inputs": {
+      "width": 1080,
+      "height": 1920,
+      "length": 450,
+      "batch_size": 1,
+      "positive": ["6", 0],
+      "negative": ["7", 0],
+      "vae": ["39", 0],
+      "start_image": ["3", 0]
+    }
+  },
+  "31": {
+    "class_type": "KSampler",
+    "inputs": {
+      "seed": 0,
+      "steps": 20,
+      "cfg": 6.0,
+      "sampler_name": "uni_pc",
+      "scheduler": "simple",
+      "denoise": 1.0,
+      "model": ["37", 0],
+      "positive": ["27", 0],
+      "negative": ["27", 1],
+      "latent_image": ["27", 2]
+    }
+  },
+  "37": {
+    "class_type": "UNETLoader",
+    "inputs": {
+      "unet_name": "wan2.2_i2v_A14B.safetensors",
+      "weight_dtype": "default"
+    }
+  },
+  "38": {
+    "class_type": "CLIPLoader",
+    "inputs": {
+      "clip_name": "umt5_xxl_fp8_e4m3fn.safetensors",
+      "type": "wan"
+    }
+  },
+  "39": {
+    "class_type": "VAELoader",
+    "inputs": {
+      "vae_name": "wan_2.1_vae.safetensors"
+    }
+  },
+  "40": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": ["31", 0],
+      "vae": ["39", 0]
+    }
+  },
+  "41": {
+    "class_type": "VHS_VideoCombine",
+    "inputs": {
+      "images": ["40", 0],
+      "frame_rate": 30,
+      "filename_prefix": "wan22_ad",
+      "format": "video/h264-mp4",
+      "pix_fmt": "yuv420p",
+      "crf": 19,
+      "save_output": true
+    }
+  }
+}

@@ -1,0 +1,5 @@
+runpod>=1.7.0
+requests>=2.31.0
+cloudinary>=1.41.0
+websocket-client>=1.8.0
+Pillow>=10.4.0
