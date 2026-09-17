@@ -8,7 +8,11 @@ Rules you must always follow:
 - Keep the tone enthusiastic but credible — like a real creator recommending something they like, not a pushy salesperson.
 - Respond only with the structured JSON the response schema requires — no extra commentary.`;
 
-export function buildUserPrompt({ productName, category, language }: GenerateInput): string {
+export function buildUserPrompt({
+  productName,
+  category,
+  language,
+}: Pick<GenerateInput, "productName" | "category" | "language">): string {
   return `Product name: ${productName}
 Category: ${category}
 Target language for written output: ${language}
