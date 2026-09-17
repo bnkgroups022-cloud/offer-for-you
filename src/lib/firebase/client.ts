@@ -33,8 +33,15 @@ assertFirebaseConfig();
 // Firebase app on every fast refresh.
 export const firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
-export const firebaseAuth = getAuth(firebaseApp);
-
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey && firebaseConfig.authDomain && firebaseConfig.projectId
 );
+
+// getAuth() synchronously validates the API key and throws (auth/invalid-api-key)
+// when it's missing or malformed. Without this guard, that throw happens at
+// module-import time — which every page pulls in via AuthContext — and crashes
+// prerendering for the entire build whenever Firebase env vars aren't set.
+// Callers already gate real usage behind isFirebaseConfigured.
+export const firebaseAuth = isFirebaseConfigured
+  ? getAuth(firebaseApp)
+  : (undefined as unknown as ReturnType<typeof getAuth>);
