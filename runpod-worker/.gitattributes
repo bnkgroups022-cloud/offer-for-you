@@ -1,0 +1,7 @@
+# These files run inside a Linux Docker container — force LF regardless
+# of core.autocrlf on the machine editing them, so a Windows edit can
+# never silently introduce a CRLF shebang that fails at container boot.
+*.sh text eol=lf
+*.py text eol=lf
+Dockerfile text eol=lf
+*.json text eol=lf
