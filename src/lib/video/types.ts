@@ -1,4 +1,5 @@
 import type { VideoProviderId } from "@/types/video";
+import type { VideoJobStatus } from "@/lib/providers/provider";
 
 /**
  * The contract every video provider adapter implements. This is the whole
@@ -32,4 +33,23 @@ export interface VideoProviderAdapter {
   isConfigured(): boolean;
   submit(input: VideoSubmitInput): Promise<VideoSubmitResult>;
   checkStatus(jobId: string): Promise<VideoStatusResult>;
+}
+
+/**
+ * Converts a VideoGenerationProvider's status (src/lib/providers/provider.ts
+ * — used by GPU-backed providers like Wan/RunPod and Hugging Face ZeroGPU,
+ * whose jobs can be "queued") into this app's VideoStatusResult (which has
+ * no "queued" state). "queued" and "processing" both mean "not done yet"
+ * to the frontend, so they collapse to "processing" here.
+ *
+ * Reconstructing the object (rather than narrowing `jobStatus` in place)
+ * is required, not stylistic: TypeScript only narrows a *plain property
+ * read* like `jobStatus.status` after an equality check, not the type of
+ * the whole `jobStatus` variable — so returning `jobStatus` itself here
+ * would still type as VideoJobStatus (queued included) and fail to
+ * satisfy VideoStatusResult.
+ */
+export function toVideoStatusResult(jobStatus: VideoJobStatus): VideoStatusResult {
+  if (jobStatus.status === "queued") return { status: "processing" };
+  return { status: jobStatus.status, videoUrl: jobStatus.videoUrl, error: jobStatus.error };
 }

@@ -1,4 +1,4 @@
-import type { VideoProviderAdapter } from "@/lib/video/types";
+import { toVideoStatusResult, type VideoProviderAdapter } from "@/lib/video/types";
 import { huggingfaceProvider } from "@/lib/providers/huggingface";
 
 /**
@@ -29,7 +29,6 @@ export const huggingfaceVideoAdapter: VideoProviderAdapter = {
 
   async checkStatus(jobId) {
     const result = await huggingfaceProvider.getJobStatus(jobId);
-    if (result.status === "queued") return { status: "processing" };
-    return result;
+    return toVideoStatusResult(result);
   },
 };

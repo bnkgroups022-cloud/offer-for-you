@@ -1,4 +1,4 @@
-import type { VideoProviderAdapter } from "@/lib/video/types";
+import { toVideoStatusResult, type VideoProviderAdapter } from "@/lib/video/types";
 import { wanProvider } from "@/lib/providers/wan";
 
 /**
@@ -29,7 +29,6 @@ export const wanVideoAdapter: VideoProviderAdapter = {
 
   async checkStatus(jobId) {
     const result = await wanProvider.getJobStatus(jobId);
-    if (result.status === "queued") return { status: "processing" };
-    return result;
+    return toVideoStatusResult(result);
   },
 };
