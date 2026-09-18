@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ProductImagePicker } from "@/components/generator/ProductImagePicker";
+import { VideoResultScreen } from "@/components/generator/VideoResultScreen";
 import { CATEGORY_OPTIONS, LANGUAGE_OPTIONS } from "@/config/generator";
 import { GENERATE_PAGE_PROVIDER_OPTIONS, WAN_VIDEO_STYLE_OPTIONS } from "@/config/video";
 import { useAuth } from "@/hooks/useAuth";
@@ -21,30 +22,6 @@ function VideoIcon() {
     <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.8}>
       <rect x="3" y="5" width="13" height="14" rx="2" />
       <path d="m21 8-5 3 5 3V8Z" strokeLinejoin="round" />
-    </svg>
-  );
-}
-
-function DownloadIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path
-        d="M12 3v12m0 0-4-4m4 4 4-4M4 17v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={1.8}>
-      <path
-        d="M8.5 10.5 15.5 7m-7 6.5 7 3.5M8 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm12-6a2 2 0 1 1-4 0 2 2 0 0 1 4 0Zm0 12a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
     </svg>
   );
 }
@@ -210,23 +187,6 @@ export function WanVideoGeneratorCard() {
       setSubmitError(err instanceof Error ? err.message : "Could not start video generation.");
     } finally {
       setIsSubmitting(false);
-    }
-  }
-
-  async function handleShare() {
-    if (!video.url) return;
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: productName || "Product video", url: video.url });
-      } catch {
-        // User cancelled the share sheet — not an error.
-      }
-      return;
-    }
-    try {
-      await navigator.clipboard.writeText(video.url);
-    } catch {
-      // Clipboard unavailable — fail silently, same as CopyButton.
     }
   }
 
@@ -425,29 +385,12 @@ export function WanVideoGeneratorCard() {
           )}
 
           {video.status === "completed" && video.url && (
-            <div className="flex flex-col gap-3">
-              <video controls src={video.url} className="w-full rounded-xl border border-white/10 bg-black" />
-              <div className="flex gap-2">
-                <a
-                  href={video.url}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
-                >
-                  <DownloadIcon />
-                  Download
-                </a>
-                <button
-                  type="button"
-                  onClick={handleShare}
-                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-200 transition-colors hover:bg-white/10"
-                >
-                  <ShareIcon />
-                  Share
-                </button>
-              </div>
-            </div>
+            <VideoResultScreen
+              videoUrl={video.url}
+              productName={productName}
+              category={categoryLabel}
+              style={style}
+            />
           )}
         </div>
       </div>

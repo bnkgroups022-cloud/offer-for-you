@@ -34,3 +34,48 @@ export function buildWanPrompt({
 
   return lines.join(" ");
 }
+
+const CAPTION_STYLE_LINE: Record<WanVideoStyle, string> = {
+  ugc: "loving how natural this feels in everyday life",
+  cinematic: "obsessed with how premium this looks on camera",
+  luxury: "this is what quiet luxury looks like",
+  tech: "the tech upgrade you didn't know you needed",
+};
+
+/** A short, ready-to-post Instagram-style caption for the Result screen's
+ *  Copy Caption button — templated, not AI-generated (this flow doesn't
+ *  go through the AI Generator's ad kit). */
+export function buildWanCaption({
+  productName,
+  style,
+}: {
+  productName: string;
+  style: WanVideoStyle;
+}): string {
+  return `${productName} ✨ ${CAPTION_STYLE_LINE[style]}. Tap to see it in action 👇`;
+}
+
+function slugWords(text: string): string[] {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, "")
+    .split(/\s+/)
+    .filter(Boolean);
+}
+
+/** A handful of relevant hashtags for the Result screen's Copy Hashtags
+ *  button, derived from the product name/category — templated, same
+ *  caveat as buildWanCaption. */
+export function buildWanHashtags({
+  productName,
+  category,
+}: {
+  productName: string;
+  category?: string;
+}): string[] {
+  const fromProduct = slugWords(productName).map((word) => `#${word}`);
+  const fromCategory = category ? slugWords(category).map((word) => `#${word}`) : [];
+  const base = ["#ad", "#musthave", "#shopnow", "#newdrop"];
+
+  return Array.from(new Set([...fromProduct, ...fromCategory, ...base])).slice(0, 10);
+}
