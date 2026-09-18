@@ -5,7 +5,18 @@ import type {
   VideoJobStatus,
 } from "@/lib/providers/provider";
 
-const API_NAME = process.env.HUGGINGFACE_API_NAME || "predict";
+// Default target Space, verified live against its own /config endpoint:
+// https://huggingface.co/spaces/Saravutw/WAN2.2_I2V_LIGHTNING_4-8step_custom
+// — a public, ZeroGPU-hosted Wan 2.2 image-to-video Space (310+ likes,
+// actively running at the time this was wired up). Its real api_name is
+// "generate_video", not Gradio's generic "predict" default. Like any
+// community Space, it has no uptime guarantee — point HUGGINGFACE_SPACE /
+// HUGGINGFACE_API_NAME at your own Space if this one goes down or changes
+// its function signature (re-check via GET <space>.hf.space/config and
+// update the `data` array in generateVideo() below to match).
+const API_NAME = process.env.HUGGINGFACE_API_NAME || "generate_video";
+const DEFAULT_NEGATIVE_PROMPT =
+  "blurry, low quality, chaotic, deformed, watermark, bad anatomy, shaky camera view point";
 // How long a single status poll blocks reading the Space's SSE stream
 // before giving up and reporting "processing" — see getJobStatus() below.
 // Kept under /api/video/status's own maxDuration (30s) with headroom.
@@ -15,12 +26,25 @@ function getSpaceBaseUrl(): string {
   const space = process.env.HUGGINGFACE_SPACE;
   if (!space) throw new Error("HUGGINGFACE_SPACE isn't set.");
 
-  // Accepts either a full URL or the "username/space-name" shorthand —
-  // public HF Spaces are served at https://<user>-<space>.hf.space
-  // (slash replaced with a hyphen, lowercased). This mapping is a stable,
-  // documented Hugging Face convention.
   if (space.startsWith("http")) return space.replace(/\/+$/, "");
-  return `https://${space.replace("/", "-").toLowerCase()}.hf.space`;
+
+  // Public HF Spaces are served at https://<owner>-<space>.hf.space —
+  // the whole "owner/space" name is lowercased and every run of
+  // non-alphanumeric characters (slash, dots, underscores, ...) becomes
+  // a single hyphen. Verified against the default Space above, whose
+  // name contains both dots and underscores (a plain slash->hyphen swap,
+  // the previous version of this function, resolves to the wrong host
+  // for names like that).
+  const slug = space
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `https://${slug}.hf.space`;
+}
+
+/** Clamps to the default Space's "Duration (seconds)" slider range. */
+function clampDuration(seconds: number): number {
+  return Math.min(10, Math.max(0.5, seconds));
 }
 
 function getCallUrl(): string {
@@ -118,20 +142,16 @@ function extractVideoUrl(outputs: unknown): string | undefined {
 }
 
 /**
- * "Free" provider — a Wan 2.2 (or compatible) image-to-video Gradio Space
- * running on Hugging Face's ZeroGPU (shared, free GPU quota), called
- * through Gradio's REST API rather than a paid vendor API.
+ * "Free" provider — a Wan 2.2 image-to-video Gradio Space running on
+ * Hugging Face's ZeroGPU (shared, free GPU quota), called through
+ * Gradio's REST API rather than a paid vendor API. Defaults to, and is
+ * verified against, the live Space named at the top of this file.
  *
- * IMPORTANT — two things you must point at your actual Space:
- *  1. HUGGINGFACE_SPACE must name a real Space exposing an image+prompt
- *     -> video function. HUGGINGFACE_API_NAME (default "predict") must
- *     match that function's api_name, visible on the Space's "Use via
- *     API" page — Gradio auto-generates this from the function name
- *     unless the Space author set it explicitly, so it varies per Space.
- *  2. The `data` array order below (image, prompt, aspect ratio,
- *     duration, style) must match that function's parameter order
- *     exactly — Gradio calls positionally. Check the same "Use via API"
- *     page and reorder if needed.
+ * If you point HUGGINGFACE_SPACE at a different Space: check its real
+ * api_name and parameter order (GET <space>.hf.space/config, or its "Use
+ * via API" page) and update the `data` array in generateVideo() below to
+ * match — Gradio calls functions positionally, and both the function
+ * name and parameter list are specific to each Space.
  *
  * Gradio's REST flow is submit-once-then-stream (SSE), not a RunPod-style
  * submit+poll-by-id job API. getJobStatus() re-opens the SSE connection
@@ -150,15 +170,41 @@ export const huggingfaceProvider: VideoGenerationProvider = {
   async generateVideo({
     imageUrl,
     prompt,
-    aspectRatio,
     duration,
     style,
   }: GenerateVideoParams): Promise<GenerateVideoResult> {
+    // The default target Space has no separate "style"/"aspect ratio"
+    // controls (aspect ratio follows the input image), so style is
+    // folded into the prompt text itself instead of a dedicated field.
+    const promptText = style ? `${style} style. ${prompt}` : prompt;
+
+    // Positional args for api_name "generate_video", in the exact order
+    // its /config reports — Gradio calls functions positionally, so this
+    // order matters. Everything after promptText is a generation knob
+    // the Space exposes that this app has no equivalent field for; the
+    // values below are that Space's own defaults.
     const response = await fetch(getCallUrl(), {
       method: "POST",
       headers: buildHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
-        data: [imageUrl, prompt, aspectRatio ?? "9:16", duration ?? 15, style ?? "ugc"],
+        data: [
+          { url: imageUrl }, // Input Image
+          null, // Last Image (Optional)
+          promptText, // Prompt
+          4, // Inference Steps
+          DEFAULT_NEGATIVE_PROMPT, // Negative Prompt
+          clampDuration(duration ?? 10), // Duration (seconds) — Space max is 10
+          1, // Guidance Scale - high noise stage
+          1, // Guidance Scale 2 - low noise stage
+          0, // Seed (ignored — Randomize seed is true below)
+          true, // Randomize seed
+          5, // Video Quality
+          "UniPCMultistep", // Scheduler
+          3.0, // Flow Shift
+          16, // Video Fluidity (frames per second)
+          false, // Safe Mode
+          true, // Display result — must stay true so a video is returned
+        ],
       }),
     });
 
