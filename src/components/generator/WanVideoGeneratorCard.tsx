@@ -49,6 +49,12 @@ function ShareIcon() {
   );
 }
 
+function formatElapsed(totalSeconds: number): string {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 const IDLE_VIDEO: ProjectVideo = {
   provider: null,
   prompt: null,
@@ -85,8 +91,11 @@ export function WanVideoGeneratorCard() {
   const [video, setVideo] = useState<ProjectVideo>(IDLE_VIDEO);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const elapsedRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const processingStartedAtRef = useRef<number | null>(null);
 
   const categoryLabel = useMemo(() => {
     if (categoryValue === "other") return customCategory.trim();
@@ -116,13 +125,44 @@ export function WanVideoGeneratorCard() {
     }
   }, []);
 
-  useEffect(() => stopPolling, [stopPolling]);
+  const stopElapsedTimer = useCallback(() => {
+    if (elapsedRef.current) {
+      clearInterval(elapsedRef.current);
+      elapsedRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopPolling();
+      stopElapsedTimer();
+    };
+  }, [stopPolling, stopElapsedTimer]);
+
+  // Real elapsed time (not a fabricated percentage — the provider gives
+  // no granular progress) so "processing" doesn't look stuck during a
+  // multi-minute ZeroGPU generation.
+  useEffect(() => {
+    if (video.status !== "processing") {
+      stopElapsedTimer();
+      return;
+    }
+
+    elapsedRef.current = setInterval(() => {
+      const startedAt = processingStartedAtRef.current;
+      setElapsedSeconds(startedAt ? Math.max(0, Math.floor((Date.now() - startedAt) / 1000)) : 0);
+    }, 1000);
+
+    return stopElapsedTimer;
+  }, [video.status, stopElapsedTimer]);
 
   // A different (or removed) image means a different generation — don't
   // let a retry silently reuse a project row created for the old photo.
   useEffect(() => {
     setProjectId(null);
     setVideo(IDLE_VIDEO);
+    setElapsedSeconds(0);
+    processingStartedAtRef.current = null;
     stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [image.asset?.publicId]);
@@ -163,6 +203,8 @@ export function WanVideoGeneratorCard() {
 
       setProjectId(newProjectId);
       setVideo({ provider, prompt: null, status: "processing", jobId, url: null, error: null });
+      processingStartedAtRef.current = Date.now();
+      setElapsedSeconds(0);
       pollStatus(newProjectId, user.uid);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not start video generation.");
@@ -368,7 +410,9 @@ export function WanVideoGeneratorCard() {
                 <p className="text-sm text-slate-300">
                   {selectedProviderOption?.label ?? "Your provider"} is generating your video…
                 </p>
-                <p className="mt-1 text-xs text-slate-500">This can take a couple of minutes.</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Elapsed {formatElapsed(elapsedSeconds)} — this can take a couple of minutes.
+                </p>
               </div>
             </div>
           )}
