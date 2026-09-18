@@ -1,4 +1,4 @@
-export type VideoProviderId = "hailuo" | "pixverse" | "kling" | "wan" | "huggingface";
+export type VideoProviderId = "hailuo" | "pixverse" | "kling" | "wan" | "huggingface" | "imagine";
 
 export type VideoStatus = "idle" | "processing" | "completed" | "failed";
 

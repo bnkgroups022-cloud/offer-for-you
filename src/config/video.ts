@@ -17,7 +17,23 @@ export const VIDEO_PROVIDER_OPTIONS: {
   { id: "huggingface", label: "Free (Hugging Face ZeroGPU)", placeholder: false },
 ];
 
-/** Video style presets for the Wan 2.2 UGC ad generator on /dashboard/generate. */
+/**
+ * Provider options for the video card on /dashboard/generate. Distinct
+ * from VIDEO_PROVIDER_OPTIONS above (the Download Assets page's fuller
+ * list, unchanged) — here, per Phase 4.1, only Free (ZeroGPU) is wired
+ * up; RunPod and Imagine are shown as disabled "coming soon" options.
+ */
+export const GENERATE_PAGE_PROVIDER_OPTIONS: {
+  id: VideoProviderId;
+  label: string;
+  placeholder: boolean;
+}[] = [
+  { id: "huggingface", label: "Free (ZeroGPU)", placeholder: false },
+  { id: "wan", label: "RunPod (Wan 2.2)", placeholder: true },
+  { id: "imagine", label: "Imagine", placeholder: true },
+];
+
+/** Video style presets for the UGC ad generator on /dashboard/generate. */
 export const WAN_VIDEO_STYLE_OPTIONS: { value: WanVideoStyle; label: string }[] = [
   { value: "ugc", label: "UGC" },
   { value: "cinematic", label: "Cinematic" },

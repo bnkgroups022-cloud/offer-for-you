@@ -4,11 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Card, CardHeader } from "@/components/ui/Card";
 import { ProductImagePicker } from "@/components/generator/ProductImagePicker";
 import { CATEGORY_OPTIONS, LANGUAGE_OPTIONS } from "@/config/generator";
-import { WAN_VIDEO_STYLE_OPTIONS } from "@/config/video";
+import { GENERATE_PAGE_PROVIDER_OPTIONS, WAN_VIDEO_STYLE_OPTIONS } from "@/config/video";
 import { useAuth } from "@/hooks/useAuth";
 import { useSingleImageUpload } from "@/hooks/useSingleImageUpload";
 import { generateVideo, fetchVideoStatus } from "@/lib/projects/client";
-import type { ProjectVideo, WanVideoStyle } from "@/types/video";
+import type { ProjectVideo, VideoProviderId, WanVideoStyle } from "@/types/video";
 
 const POLL_INTERVAL_MS = 5000;
 
@@ -59,10 +59,14 @@ const IDLE_VIDEO: ProjectVideo = {
 };
 
 /**
- * Phase 1 — Wan 2.2 UGC video ad generator. Self-contained: its own
+ * AI video ad generator on /dashboard/generate. Self-contained: its own
  * signed-upload image picker, its own fields, its own submit + poll
  * lifecycle. Deliberately not sharing state with GeneratorForm /
  * GeneratorResults above it on this page — those stay untouched.
+ *
+ * Provider selector added in Phase 4.1: Free (Hugging Face ZeroGPU) is
+ * the only one wired up; RunPod (Wan 2.2) and Imagine are shown as
+ * disabled "coming soon" options (see GENERATE_PAGE_PROVIDER_OPTIONS).
  */
 export function WanVideoGeneratorCard() {
   const { user } = useAuth();
@@ -73,6 +77,9 @@ export function WanVideoGeneratorCard() {
   const [customCategory, setCustomCategory] = useState("");
   const [language, setLanguage] = useState<string>(LANGUAGE_OPTIONS[0].value);
   const [style, setStyle] = useState<WanVideoStyle>(WAN_VIDEO_STYLE_OPTIONS[0].value);
+  const [provider, setProvider] = useState<VideoProviderId>(
+    GENERATE_PAGE_PROVIDER_OPTIONS.find((p) => !p.placeholder)?.id ?? GENERATE_PAGE_PROVIDER_OPTIONS[0].id
+  );
 
   const [projectId, setProjectId] = useState<string | null>(null);
   const [video, setVideo] = useState<ProjectVideo>(IDLE_VIDEO);
@@ -91,11 +98,15 @@ export function WanVideoGeneratorCard() {
     [language]
   );
 
+  const selectedProviderOption = GENERATE_PAGE_PROVIDER_OPTIONS.find((p) => p.id === provider);
+
   const isValid =
     image.status === "success" &&
     !!image.asset &&
     productName.trim().length > 0 &&
-    categoryLabel.length > 0;
+    categoryLabel.length > 0 &&
+    !!selectedProviderOption &&
+    !selectedProviderOption.placeholder;
   const isBusy = isSubmitting || video.status === "processing";
 
   const stopPolling = useCallback(() => {
@@ -141,7 +152,7 @@ export function WanVideoGeneratorCard() {
         // creating a duplicate one each time Generate Video is clicked.
         projectId: projectId ?? undefined,
         uid: user.uid,
-        provider: "wan",
+        provider,
         imageUrl: image.asset.secureUrl,
         imagePublicId: image.asset.publicId,
         productName: productName.trim(),
@@ -151,7 +162,7 @@ export function WanVideoGeneratorCard() {
       });
 
       setProjectId(newProjectId);
-      setVideo({ provider: "wan", prompt: null, status: "processing", jobId, url: null, error: null });
+      setVideo({ provider, prompt: null, status: "processing", jobId, url: null, error: null });
       pollStatus(newProjectId, user.uid);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "Could not start video generation.");
@@ -185,9 +196,9 @@ export function WanVideoGeneratorCard() {
             <VideoIcon />
           </span>
           <div>
-            <p className="text-sm font-semibold text-white">Wan 2.2 Video Ad Generator</p>
+            <p className="text-sm font-semibold text-white">AI Video Ad Generator</p>
             <p className="text-xs text-slate-500">
-              One product photo in, a 15-second vertical UGC ad out — via RunPod + Wan 2.2.
+              One product photo in, a 15-second vertical UGC ad out.
             </p>
           </div>
         </div>
@@ -195,6 +206,35 @@ export function WanVideoGeneratorCard() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
+          <div>
+            <span className={fieldLabel}>Video Provider</span>
+            <div className="flex flex-wrap gap-2">
+              {GENERATE_PAGE_PROVIDER_OPTIONS.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  disabled={option.placeholder || isBusy}
+                  onClick={() => setProvider(option.id)}
+                  title={option.placeholder ? `${option.label} isn't connected yet — coming soon.` : undefined}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                    option.placeholder
+                      ? "cursor-not-allowed border-white/10 bg-white/[0.03] text-slate-600"
+                      : provider === option.id
+                        ? "border-brand-accent/40 bg-brand-accent/15 text-brand-accent"
+                        : "border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  }`}
+                >
+                  {option.label}
+                  {option.placeholder && (
+                    <span className="ml-1.5 rounded-full bg-white/10 px-1.5 py-0.5 text-[9px] uppercase tracking-wide">
+                      Soon
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div>
             <span className={fieldLabel}>Product Image</span>
             <ProductImagePicker image={image} />
@@ -325,7 +365,9 @@ export function WanVideoGeneratorCard() {
                 <span className="relative h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-brand-accent" />
               </span>
               <div>
-                <p className="text-sm text-slate-300">Wan 2.2 is generating your video…</p>
+                <p className="text-sm text-slate-300">
+                  {selectedProviderOption?.label ?? "Your provider"} is generating your video…
+                </p>
                 <p className="mt-1 text-xs text-slate-500">This can take a couple of minutes.</p>
               </div>
             </div>
