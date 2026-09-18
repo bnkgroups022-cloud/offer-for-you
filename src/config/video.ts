@@ -14,6 +14,7 @@ export const VIDEO_PROVIDER_OPTIONS: {
   { id: "pixverse", label: "PixVerse", placeholder: false },
   { id: "kling", label: "Kling", placeholder: true },
   { id: "wan", label: "Wan 2.2 (RunPod)", placeholder: false },
+  { id: "huggingface", label: "Free (Hugging Face ZeroGPU)", placeholder: false },
 ];
 
 /** Video style presets for the Wan 2.2 UGC ad generator on /dashboard/generate. */

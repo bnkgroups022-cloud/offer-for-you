@@ -12,7 +12,13 @@ import type { VideoProviderId } from "@/types/video";
  * where video_url actually gets saved) before returning the up-to-date
  * project. If there's no job in flight, just returns the project as-is —
  * this route is safe to call any time, not only while "processing".
+ *
+ * Extended beyond the platform default: the "Free" (Hugging Face
+ * ZeroGPU) provider's checkStatus() can block up to ~8s reading an SSE
+ * stream per call (see src/lib/providers/huggingface.ts) — give it room.
  */
+export const maxDuration = 30;
+
 export async function GET(request: NextRequest) {
   const parsed = videoStatusQuerySchema.safeParse({
     projectId: request.nextUrl.searchParams.get("projectId") ?? undefined,
